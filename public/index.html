@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PractiIZY - Plataforma de Gestión de Prácticas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar-custom { background-color: #1e3a8a; }
+        .card-custom { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+        .login-box { max-width: 420px; margin: 80px auto; }
+        .badge-estudiante { background-color: #0d6efd; }
+        .badge-supervisor { background-color: #198754; }
+        .badge-tutor { background-color: #6f42c1; }
+    </style>
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">🎓 PractiIZY</a>
+            <div id="userInfo" class="text-white d-none align-items-center gap-3">
+                <span id="userName"></span>
+                <span id="userRol" class="badge"></span>
+                <button class="btn btn-outline-light btn-sm" onclick="logout()">Cerrar Sesión</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+
+        <!-- PANTALLA DE LOGIN -->
+        <div id="loginSection" class="login-box card card-custom p-4 bg-white">
+            <h3 class="text-center text-primary mb-3 font-weight-bold">Iniciar Sesión</h3>
+            <p class="text-muted text-center small mb-4">Ingrese sus credenciales de PractiIZY</p>
+            
+            <form id="formLogin">
+                <div class="mb-3">
+                    <label class="form-label font-weight-bold">Correo Electrónico</label>
+                    <input type="email" id="loginCorreo" class="form-control" placeholder="ejemplo@ibero.edu.co" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label font-weight-bold">Contraseña</label>
+                    <input type="password" id="loginPass" class="form-control" value="123456" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 fw-bold py-2">Ingresar a la Plataforma</button>
+            </form>
+
+            <hr class="my-4">
+            <div class="small text-muted">
+                <strong>Cuentas de prueba rápidas:</strong><br>
+                👨‍🎓 <code>oscar.jaimes@ibero.edu.co</code> (Estudiante)<br>
+                👨‍💼 <code>supervisor@empresa.com</code> (Supervisor)<br>
+                👩‍🏫 <code>ana.mosquera@ibero.edu.co</code> (Tutor Académico)<br>
+                🔑 Contraseña para todas: <code>123456</code>
+            </div>
+        </div>
+
+        <!-- PANEL DASHBOARD PRINCIPAL -->
+        <div id="dashboardSection" class="d-none">
+
+            <!-- FORMULARIO REGISTRO BITÁCORA (SOLO ESTUDIANTES) -->
+            <div id="seccionFormularioBitacora" class="card card-custom p-4 bg-white mb-4 d-none">
+                <h4 class="text-primary mb-3">Registrar Nueva Bitácora de Horas</h4>
+                <form id="formBitacora" class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Fecha de Actividad</label>
+                        <input type="date" class="form-control" id="fechaBitacora" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Horas Realizadas</label>
+                        <input type="number" class="form-control" id="horasBitacora" min="1" max="12" required>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">Descripción Detallada</label>
+                        <input type="text" class="form-control" id="descBitacora" placeholder="Ej: Implementación de rutas backend y pruebas de la API" required>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success w-100 fw-bold">Guardar Bitácora</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TABLA DE HISTÓRICO Y EVALUACIÓN -->
+            <div class="card card-custom p-4 bg-white">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="m-0" id="tituloTabla">Gestión y Trazabilidad de Bitácoras</h4>
+                    <span id="mensajeRestriccion" class="badge bg-secondary"></span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th># ID</th>
+                                <th>Estudiante</th>
+                                <th>Fecha</th>
+                                <th>Horas</th>
+                                <th>Descripción de la Actividad</th>
+                                <th>Estado</th>
+                                <th class="text-center">Acción de Validación</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaBitacoras"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        let usuarioActual = null;
+
+        // Login Submit
+        document.getElementById('formLogin').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const correo = document.getElementById('loginCorreo').value;
+            const password = document.getElementById('loginPass').value;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ correo, password })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    usuarioActual = data.usuario;
+                    mostrarDashboard();
+                } else {
+                    alert(data.mensaje);
+                }
+            } catch (err) {
+                alert('Error al conectar con el servidor.');
+            }
+        });
+
+        function mostrarDashboard() {
+            document.getElementById('loginSection').classList.add('d-none');
+            document.getElementById('dashboardSection').classList.remove('d-none');
+            
+            const userInfo = document.getElementById('userInfo');
+            userInfo.classList.remove('d-none');
+            userInfo.classList.add('d-flex');
+
+            document.getElementById('userName').innerText = usuarioActual.nombre;
+            const badgeRol = document.getElementById('userRol');
+            badgeRol.innerText = usuarioActual.rol;
+            badgeRol.className = `badge badge-${usuarioActual.rol.toLowerCase()}`;
+
+            // Control de vistas según ROL
+            const formSeccion = document.getElementById('seccionFormularioBitacora');
+            const mensajeRestriccion = document.getElementById('mensajeRestriccion');
+
+            if (usuarioActual.rol === 'Estudiante') {
+                formSeccion.classList.remove('d-none');
+                mensajeRestriccion.innerText = 'Modo Estudiante: Puede registrar actividades. La aprobación requiere validación del Supervisor.';
+            } else {
+                formSeccion.classList.add('d-none');
+                mensajeRestriccion.innerText = `Modo ${usuarioActual.rol}: Facultado para revisar y aprobar/rechazar bitácoras.`;
+            }
+
+            cargarBitacoras();
+        }
+
+        function logout() {
+            usuarioActual = null;
+            document.getElementById('loginSection').classList.remove('d-none');
+            document.getElementById('dashboardSection').classList.add('d-none');
+            document.getElementById('userInfo').classList.add('d-none');
+            document.getElementById('userInfo').classList.remove('d-flex');
+            document.getElementById('formLogin').reset();
+        }
+
+        async function cargarBitacoras() {
+            let url = '/api/bitacoras';
+            if (usuarioActual.rol === 'Estudiante') {
+                url += `?estudianteId=${usuarioActual.id}`;
+            }
+
+            const res = await fetch(url);
+            const bitacoras = await res.json();
+            const tbody = document.getElementById('tablaBitacoras');
+            tbody.innerHTML = '';
+
+            bitacoras.forEach(b => {
+                let badgeEstado = 'bg-warning text-dark';
+                if (b.estado === 'Aprobado') badgeEstado = 'bg-success';
+                if (b.estado === 'Rechazado') badgeEstado = 'bg-danger';
+
+                let botonesAccion = '<span class="text-muted small">Sin permisos</span>';
+
+                // Solo Supervisor y Tutor pueden Aprobar / Rechazar
+                if (usuarioActual.rol === 'Supervisor' || usuarioActual.rol === 'Tutor') {
+                    if (b.estado === 'Pendiente') {
+                        botonesAccion = `
+                            <button class="btn btn-sm btn-success me-1" onclick="cambiarEstado(${b.id}, 'aprobar')">✓ Aprobar</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="cambiarEstado(${b.id}, 'rechazar')">✗ Rechazar</button>
+                        `;
+                    } else {
+                        botonesAccion = `<span class="badge bg-light text-dark border">Procesado</span>`;
+                    }
+                } else if (usuarioActual.rol === 'Estudiante') {
+                    botonesAccion = b.estado === 'Pendiente' ? '<span class="text-muted small">En revisión</span>' : '<span class="text-success fw-bold">✓ Validado</span>';
+                }
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>#${b.id}</strong></td>
+                        <td>${b.estudianteNombre}</td>
+                        <td>${b.fecha}</td>
+                        <td><span class="badge bg-light text-dark border">${b.horas} hrs</span></td>
+                        <td>${b.descripcion}</td>
+                        <td><span class="badge ${badgeEstado}">${b.estado}</span></td>
+                        <td class="text-center">${botonesAccion}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Enviar nueva bitácora (Estudiante)
+        document.getElementById('formBitacora').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const body = {
+                estudianteId: usuarioActual.id,
+                estudianteNombre: usuarioActual.nombre,
+                fecha: document.getElementById('fechaBitacora').value,
+                horas: document.getElementById('horasBitacora').value,
+                descripcion: document.getElementById('descBitacora').value,
+                rol: usuarioActual.rol
+            };
+
+            const res = await fetch('/api/bitacoras', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (res.ok) {
+                e.target.reset();
+                cargarBitacoras();
+            } else {
+                const data = await res.json();
+                alert(data.mensaje);
+            }
+        });
+
+        // Cambiar estado (Supervisor / Tutor)
+        async function cambiarEstado(id, accion) {
+            const res = await fetch(`/api/bitacoras/${id}/estado`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accion, rol: usuarioActual.rol })
+            });
+
+            if (res.ok) {
+                cargarBitacoras();
+            } else {
+                const data = await res.json();
+                alert(data.mensaje);
+            }
+        }
+    </script>
+</body>
+</html>
